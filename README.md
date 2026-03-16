@@ -241,7 +241,7 @@ pio run --target upload
 Making a small wearable sensor on the leg and it can detect when user are actually walking to confirm whether the user has woken up or not. Since now the sensor device is too big to be attached on the body
 ---
 
-## 📋 Schematic & Diagrams
+## 📋 Schematic & PCB Layout
 
 - KiCad schematic: [`hardware/schematic/`](hardware/Files/Schematic/)
 - PCB layout: [`hardware/pcb/`](hardware/Files/PCB/)
