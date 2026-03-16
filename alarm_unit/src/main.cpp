@@ -167,17 +167,10 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *data, int len){
     Serial.printf("[RECV] X=%.2f Y=%.2f Z=%.2f\n",gX,gY,gZ);
 
     if(appState==STATE_ALARMING){
-        // X axis has hardware noise ~2.3g per sample — excluded from detection
-        // Only use Y and Z which are stable at rest (Y≈-2.39, Z≈9.5 = gravity)
+        float dX=fabsf(gX-prevGX);
         float dY=fabsf(gY-prevGY);
         float dZ=fabsf(gZ-prevGZ);
-
-        // Dead-zone: ignore < 0.15g (Y/Z noise floor is ~0.04g)
-        #define DEAD_ZONE 0.15f
-        if(dY < DEAD_ZONE) dY = 0;
-        if(dZ < DEAD_ZONE) dZ = 0;
-
-        float rawMag = dY + dZ;   // X excluded
+        float rawMag=dX+dY+dZ;
         float smoothMag=smaUpdate(rawMag);
 
         static float calibBuf[CALIB_SAMPLES];
@@ -426,6 +419,73 @@ void setup(){
     analogReadResolution(12);
     Wire.begin(6,7);
     if(!display.begin(SSD1306_SWITCHCAPVCC,OLED_ADDR)){ Serial.println("[ERROR] OLED"); while(1) delay(500); }
+    // ── Boot Splash — animated alarm clock ──────────────────────────────────
+    // Draw alarm clock face + shake animation + "Wake to Shake!" text
+    for (int frame = 0; frame < 18; frame++) {
+        display.clearDisplay();
+
+        // Shake offset: alternates -2, 0, +2 pixels
+        int shake = 0;
+        if (frame < 12) {  // shake for first 12 frames
+            int s = frame % 3;
+            shake = (s == 0) ? -2 : (s == 1) ? 0 : 2;
+        }
+
+        int cx = 38 + shake;   // clock center X
+        int cy = 30;           // clock center Y
+        int cr = 22;           // clock radius
+
+        // Clock body (outer circle)
+        display.drawCircle(cx, cy, cr, SSD1306_WHITE);
+        display.drawCircle(cx, cy, cr - 1, SSD1306_WHITE);
+
+        // Bell bumps on top
+        display.fillCircle(cx - 14 + shake, cy - 20, 4, SSD1306_WHITE);
+        display.fillCircle(cx + 14 + shake, cy - 20, 4, SSD1306_WHITE);
+
+        // Clock legs on bottom
+        display.fillTriangle(cx - 12 + shake, cy + cr,
+                             cx - 18 + shake, cy + cr + 7,
+                             cx - 6  + shake, cy + cr + 7, SSD1306_WHITE);
+        display.fillTriangle(cx + 12 + shake, cy + cr,
+                             cx + 6  + shake, cy + cr + 7,
+                             cx + 18 + shake, cy + cr + 7, SSD1306_WHITE);
+
+        // Hour hand (pointing ~10 o'clock)
+        display.drawLine(cx, cy, cx - 8 + shake, cy - 12, SSD1306_WHITE);
+        // Minute hand (pointing ~12 o'clock, slightly right)
+        display.drawLine(cx, cy, cx + 3 + shake, cy - 16, SSD1306_WHITE);
+
+        // Center dot
+        display.fillCircle(cx, cy, 2, SSD1306_WHITE);
+
+        // Vibration lines when shaking
+        if (frame < 12 && frame % 2 == 0) {
+            display.drawLine(cx - cr - 5 + shake, cy - 5, cx - cr - 10 + shake, cy - 8, SSD1306_WHITE);
+            display.drawLine(cx - cr - 5 + shake, cy + 3, cx - cr - 10 + shake, cy + 6, SSD1306_WHITE);
+            display.drawLine(cx + cr + 5 + shake, cy - 5, cx + cr + 10 + shake, cy - 8, SSD1306_WHITE);
+            display.drawLine(cx + cr + 5 + shake, cy + 3, cx + cr + 10 + shake, cy + 6, SSD1306_WHITE);
+        }
+
+        // "Wake to Shake!" text on right side
+        display.setTextColor(SSD1306_WHITE);
+        display.setTextSize(1);
+        display.setCursor(70, 18);
+        display.print("Shake to");
+        display.setTextSize(1);
+        display.setCursor(70, 30);
+        display.print("Wake!");
+
+        // Dots animation under text
+        display.setCursor(70, 44);
+        for (int d = 0; d <= (frame % 4); d++) display.print(".");
+
+        display.display();
+        delay(120);
+    }
+    display.clearDisplay();
+    display.display();
+
     Serial.println("[MOTOR] Zeroing...");
     motor.zero();
     Serial.println("[MOTOR] Ready");

@@ -13,7 +13,7 @@ smart-alarm-clock/
 ├── alarm_unit/                  # Bedside alarm unit firmware (XIAO ESP32-C3)
 │   ├── src/main.cpp
 │   └── platformio.ini
-├── sensor_unit/                 # Wrist sensor firmware (XIAO ESP32-C3)
+├── sensor_unit/                 # sensor firmware (XIAO ESP32-C3)
 │   ├── src/main.cpp
 │   └── platformio.ini
 ├── datasheet/                   # Component datasheets
@@ -80,7 +80,7 @@ A  sensor device that detects motion and transmits data wirelessly to the bedsid
 
 ### Device 2 — Bedside Alarm Unit
 
-The bedside unit alerts the user at the scheduled time and tracks motion progress received from the wrist sensor.
+The bedside unit alerts the user at the scheduled time and tracks motion progress received from the sensor.
 
 | Component | Part | Notes |
 |---|---|---|
@@ -95,7 +95,7 @@ The bedside unit alerts the user at the scheduled time and tracks motion progres
 
 **How it works:**
 1. At scheduled alarm time: buzzer plays Für Elise, LED blinks, OLED shows `!! ALARM !!`
-2. ESP-NOW initialises and connects to wrist sensor
+2. ESP-NOW initialises and connects to sensor
 3. Sensor calibrates for 1 second → OLED shows `Calibrated!`
 4. Motion detected → progress bar +10%, motor advances
 5. X27 motor visually tracks progress (0° → 315° over 10 increments)
@@ -116,14 +116,14 @@ The bedside unit alerts the user at the scheduled time and tracks motion progres
 
 ```
 ┌──────────────────────────┐              ┌──────────────────────────┐
-│   WRIST SENSOR           │              │   BEDSIDE ALARM UNIT     │
+│   ..... SENSOR           │              │   BEDSIDE ALARM UNIT     │
 │   XIAO ESP32-C3          │   ESP-NOW    │   XIAO ESP32-C3          │
 │                          │  2.4 GHz     │                          │
 │  ADXL345 → DSP → TX ────┼─────────────►│  RX → Progress Logic    │
 │                          │              │                          │
 │  500mAh LiPo             │              │  OLED + X27 Motor        │
 │  USB-C charge            │              │  Buzzer + LED + Buttons  │
-│  Wrist-worn              │              │  USB-C mains             │
+│                          │              │  USB-C mains             │
 └──────────────────────────┘              └──────────────────────────┘
 
 Protocols: I²C (ADXL345, OLED) | GPIO (Motor, LED, Buzzer) | ADC (Pot)
@@ -140,13 +140,13 @@ Protocols: I²C (ADXL345, OLED) | GPIO (Motor, LED, Buzzer) | ADC (Pot)
 2. Buzzer (Für Elise) + LED blink + OLED "!! ALARM !!" activated
         │
         ▼
-3. ESP-NOW starts → connects to wrist sensor
+3. ESP-NOW starts → connects to  sensor
         │
         ▼
 4. Calibrate baseline (~1s, hold still) → "Calibrated!" on OLED
         │
         ▼
-5. User moves wrist
+5. User moves sensor
         │
    ┌────┴──────────────────────┐
    │  Motion detected?          │
@@ -167,7 +167,7 @@ Protocols: I²C (ADXL345, OLED) | GPIO (Motor, LED, Buzzer) | ADC (Pot)
 
 ## 📐 DSP Signal Processing Pipeline
 
-The wrist sensor uses an **Adaptive DSP pipeline** — threshold self-calibrates at each alarm onset:
+The sensor uses an **Adaptive DSP pipeline** — threshold self-calibrates at each alarm onset:
 
 | Step | Technique | Detail |
 |---|---|---|
@@ -186,18 +186,32 @@ The wrist sensor uses an **Adaptive DSP pipeline** — threshold self-calibrates
 ---
 
 ## 🔋 Power Considerations
+ 
+### Sensor Unit — 3.7V 500mAh LiPo
+ 
+| Parameter | Calculation | Value |
+|---|---|---|
+| Usage per day | Alarm time | 15 min (0.25h) |
+| Standby time/day | 24h − 0.25h | 23.75h |
+| Standby energy | 6.73 mW × 23.75h | 159.8 mWh |
+| Alarm energy | 95.4 mW × 0.25h | 23.8 mWh |
+| **Energy per day** | 159.8 + 23.8 | **183.6 mWh** |
+| Battery needed (1 week) | 1,285 mWh ÷ (3.7 × 0.85) | 409 mAh |
+| **Battery chosen** | Standard LiPo | **500 mAh ✅** |
+| **Battery life** | 1,572 mWh ÷ 183.6 mWh/day | **~7.6 days** |
+ 
+| Metric | Value |
+|---|---|
+| Active Draw (alarming) | ~25.8 mA |
+| Sleep Draw (standby) | ~1.8 mA |
+| Charging | USB-C, ~1h |
+ 
 
-| Device | Power Source | Standby | Active Peak | Notes |
-|---|---|---|---|---|
-| Wrist Sensor | 3.7V 500mAh LiPo | ~2mA | ~28mA (ESP-NOW TX) | ~17h full-active |
-| Alarm Unit | USB-C 5V mains | ~18mA | ~95mA (motor + buzzer) | No battery needed |
-
-- ESP-NOW active **only during alarm** — saves power on both devices
-- Motor coils released when idle — saves ~40mA
+See more detail in [Battery Consideration](hardware/Files/ShakeToWake_BatterySizing.xlsx)
 
 ---
 
-## 💰 Bill of Materials
+## 💰 Bill of Materials (Budgeting)
 
 | Component | Qty | Unit | Total |
 |---|---|---|---|
